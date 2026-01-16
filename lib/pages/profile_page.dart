@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../data/user_data.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -13,20 +15,49 @@ class _ProfilePageState extends State<ProfilePage> {
   late TextEditingController emailC;
   late TextEditingController alamatC;
   late TextEditingController passwordC;
-  late TextEditingController phoneC; // ✅
+  late TextEditingController phoneC;
 
   bool showPassword = false;
+  File? profileImage;
 
   @override
   void initState() {
     super.initState();
+
     namaC = TextEditingController(text: UserData.nama ?? '');
     emailC = TextEditingController(text: UserData.email ?? '');
     alamatC = TextEditingController(text: UserData.alamat ?? '');
     passwordC = TextEditingController(text: UserData.password ?? '');
     phoneC = TextEditingController(text: UserData.phone ?? '');
+
+    /// LOAD FOTO JIKA ADA
+    if (UserData.profileImagePath != null &&
+        UserData.profileImagePath!.isNotEmpty) {
+      profileImage = File(UserData.profileImagePath!);
+    }
   }
 
+  /// ===============================
+  /// PILIH FOTO
+  /// ===============================
+  Future<void> pilihFoto(ImageSource source) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: source,
+      imageQuality: 70,
+    );
+
+    if (picked != null) {
+      setState(() {
+        profileImage = File(picked.path);
+        UserData.profileImagePath = picked.path;
+      });
+    }
+  }
+
+  /// ===============================
+  /// SIMPAN PROFILE
+  /// ===============================
   void simpanProfile() {
     if (namaC.text.isEmpty ||
         emailC.text.isEmpty ||
@@ -39,13 +70,11 @@ class _ProfilePageState extends State<ProfilePage> {
       return;
     }
 
-    setState(() {
-      UserData.nama = namaC.text;
-      UserData.email = emailC.text;
-      UserData.alamat = alamatC.text;
-      UserData.password = passwordC.text;
-      UserData.phone = phoneC.text;
-    });
+    UserData.nama = namaC.text;
+    UserData.email = emailC.text;
+    UserData.alamat = alamatC.text;
+    UserData.password = passwordC.text;
+    UserData.phone = phoneC.text;
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -55,7 +84,9 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  /// 🔐 GANTI PASSWORD KARENA LUPA
+  /// ===============================
+  /// LUPA PASSWORD
+  /// ===============================
   void lupaPassword() {
     final newPassC = TextEditingController();
 
@@ -66,9 +97,7 @@ class _ProfilePageState extends State<ProfilePage> {
         content: TextField(
           controller: newPassC,
           obscureText: true,
-          decoration: const InputDecoration(
-            labelText: 'Password Baru',
-          ),
+          decoration: const InputDecoration(labelText: 'Password Baru'),
         ),
         actions: [
           TextButton(
@@ -111,13 +140,64 @@ class _ProfilePageState extends State<ProfilePage> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            const CircleAvatar(
-              radius: 45,
-              backgroundColor: Colors.deepPurple,
-              child: Icon(Icons.person, size: 50, color: Colors.white),
+            /// FOTO PROFILE
+            Stack(
+              alignment: Alignment.bottomRight,
+              children: [
+                CircleAvatar(
+                  radius: 50,
+                  backgroundColor: Colors.deepPurple.shade100,
+                  backgroundImage:
+                      profileImage != null ? FileImage(profileImage!) : null,
+                  child: profileImage == null
+                      ? const Icon(Icons.person,
+                          size: 55, color: Colors.white)
+                      : null,
+                ),
+                InkWell(
+                  onTap: () {
+                    showModalBottomSheet(
+                      context: context,
+                      shape: const RoundedRectangleBorder(
+                        borderRadius:
+                            BorderRadius.vertical(top: Radius.circular(20)),
+                      ),
+                      builder: (_) => Wrap(
+                        children: [
+                          ListTile(
+                            leading: const Icon(Icons.camera_alt),
+                            title: const Text('Kamera'),
+                            onTap: () {
+                              Navigator.pop(context);
+                              pilihFoto(ImageSource.camera);
+                            },
+                          ),
+                          ListTile(
+                            leading: const Icon(Icons.photo),
+                            title: const Text('Galeri'),
+                            onTap: () {
+                              Navigator.pop(context);
+                              pilihFoto(ImageSource.gallery);
+                            },
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: const BoxDecoration(
+                      color: Colors.deepPurple,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.edit,
+                        size: 18, color: Colors.white),
+                  ),
+                ),
+              ],
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
 
             TextField(
               controller: namaC,
@@ -127,7 +207,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 border: OutlineInputBorder(),
               ),
             ),
-
             const SizedBox(height: 14),
 
             TextField(
@@ -138,7 +217,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 border: OutlineInputBorder(),
               ),
             ),
-
             const SizedBox(height: 14),
 
             TextField(
@@ -150,7 +228,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 border: OutlineInputBorder(),
               ),
             ),
-
             const SizedBox(height: 14),
 
             TextField(
@@ -162,7 +239,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 border: OutlineInputBorder(),
               ),
             ),
-
             const SizedBox(height: 14),
 
             TextField(
@@ -207,10 +283,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 child: const Text(
                   'Simpan Profile',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style:
+                      TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
