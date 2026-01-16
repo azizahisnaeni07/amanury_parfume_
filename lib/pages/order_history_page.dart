@@ -8,15 +8,22 @@ class OrderHistoryPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF4F6F8),
       appBar: AppBar(
         title: const Text('Riwayat Pesanan'),
         centerTitle: true,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 1,
       ),
       body: orderHistory.isEmpty
           ? const Center(
               child: Text(
                 'Belum ada pesanan',
-                style: TextStyle(fontSize: 16),
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey,
+                ),
               ),
             )
           : ListView.builder(
@@ -25,56 +32,158 @@ class OrderHistoryPage extends StatelessWidget {
               itemBuilder: (context, index) {
                 final order = orderHistory[index];
 
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 14,
+                        offset: Offset(0, 6),
+                      ),
+                    ],
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(18),
                     child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Tanggal: ${order.tanggal.toLocal()}'
-                              .toString()
-                              .split('.')[0],
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold),
-                        ),
-
-                        const SizedBox(height: 8),
-
-                        ...order.items.map(
-                          (item) => Padding(
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 4),
-                            child: Text(
-                              '${item.produk.nama} x${item.qty}',
-                              style: const TextStyle(
-                                  color: Colors.black54),
+                        /// ===============================
+                        /// HEADER
+                        /// ===============================
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withOpacity(0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.shopping_bag,
+                                color: Colors.blue,
+                                size: 22,
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Pesanan #${index + 1}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    order.tanggal
+                                        .toLocal()
+                                        .toString()
+                                        .split('.')[0],
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color:
+                                    Colors.green.withOpacity(0.15),
+                                borderRadius:
+                                    BorderRadius.circular(20),
+                              ),
+                              child: const Text(
+                                'Berhasil',
+                                style: TextStyle(
+                                  color: Colors.green,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
 
-                        const Divider(height: 24),
+                        const SizedBox(height: 16),
 
-                        Text(
-                          'Total: ${formatRupiah(order.totalHarga)}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue,
-                          ),
+                        /// ===============================
+                        /// PRODUK
+                        /// ===============================
+                        Column(
+                          children: order.items.map(
+                            (item) {
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 6),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 6,
+                                      height: 6,
+                                      decoration: const BoxDecoration(
+                                        color: Colors.orange,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        item.produk.nama,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      'x${item.qty}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ).toList(),
                         ),
 
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 12),
+                        const Divider(),
 
-                        const Text(
-                          'Status: Berhasil',
-                          style: TextStyle(
-                              color: Colors.green,
-                              fontWeight: FontWeight.w600),
+                        /// ===============================
+                        /// TOTAL
+                        /// ===============================
+                        Row(
+                          mainAxisAlignment:
+                              MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Total Pembayaran',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                            Text(
+                              formatRupiah(order.totalHarga),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                                color: Colors.blue,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
