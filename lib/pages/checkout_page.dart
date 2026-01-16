@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../models/cart_item.dart';
 import '../utils/format_rupiah.dart';
 import 'invoice_page.dart';
+import '../models/order.dart';
+import '../data/order_data.dart';
+import '../data/cart_notifier.dart';
 
 class CheckoutPage extends StatefulWidget {
   final List<CartItem> items;
@@ -28,7 +31,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
   }
 
   /// ===============================
-  /// 🔥 FUNGSI INI YANG DIPERBAIKI
+  ///  PERBAIKAN UTAMA ADA DI SINI
   /// ===============================
   Future<void> lanjutBayar() async {
     if (namaC.text.isEmpty || alamatC.text.isEmpty) {
@@ -37,6 +40,18 @@ class _CheckoutPageState extends State<CheckoutPage> {
       );
       return;
     }
+
+    ///  SIMPAN KE RIWAYAT PESANAN
+    orderHistory.add(
+      Order(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        tanggal: DateTime.now(),
+        items: List.from(widget.items),
+        totalHarga: totalHarga,
+        nama: namaC.text,
+        alamat: alamatC.text,
+      ),
+    );
 
     final result = await Navigator.push(
       context,
@@ -51,8 +66,11 @@ class _CheckoutPageState extends State<CheckoutPage> {
       ),
     );
 
-    /// 🔥 KIRIM SINYAL BALIK KE CART PAGE
+    ///  JIKA INVOICE SELESAI
     if (result == true) {
+      widget.items.clear();
+      cartCount.value = 0;
+
       Navigator.pop(context, true);
     }
   }
@@ -68,7 +86,6 @@ class _CheckoutPageState extends State<CheckoutPage> {
         elevation: 1,
       ),
 
-      /// BODY
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -110,20 +127,23 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   (item) => Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      mainAxisAlignment:
+                          MainAxisAlignment.spaceBetween,
                       children: [
                         Expanded(
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
                             children: [
                               Text(item.produk.nama,
                                   style: const TextStyle(
-                                      fontWeight: FontWeight.bold)),
+                                      fontWeight:
+                                          FontWeight.bold)),
                               const SizedBox(height: 4),
                               Text(
                                 '${item.qty} x ${formatRupiah(item.produk.harga)}',
-                                style:
-                                    const TextStyle(color: Colors.grey),
+                                style: const TextStyle(
+                                    color: Colors.grey),
                               ),
                             ],
                           ),
@@ -153,7 +173,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 const SizedBox(height: 8),
                 rowHarga('Ongkir', 0),
                 const Divider(height: 24),
-                rowHarga('Total Pembayaran', totalHarga, bold: true),
+                rowHarga('Total Pembayaran', totalHarga,
+                    bold: true),
               ],
             ),
           ),
@@ -172,11 +193,13 @@ class _CheckoutPageState extends State<CheckoutPage> {
           ],
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisAlignment:
+              MainAxisAlignment.spaceBetween,
           children: [
             Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
               children: [
                 const Text('Total Pembayaran',
                     style: TextStyle(color: Colors.grey)),
@@ -193,10 +216,13 @@ class _CheckoutPageState extends State<CheckoutPage> {
               onPressed: lanjutBayar,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.orange,
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 32, vertical: 14),
+                padding:
+                    const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 14),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius:
+                      BorderRadius.circular(12),
                 ),
               ),
               child: const Text('Buat Pesanan'),
@@ -221,7 +247,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
           const SizedBox(width: 8),
           Text(title,
               style: const TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.bold)),
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold)),
         ],
       );
 
@@ -232,16 +259,21 @@ class _CheckoutPageState extends State<CheckoutPage> {
         ),
       );
 
-  Widget rowHarga(String label, int harga, {bool bold = false}) => Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget rowHarga(String label, int harga,
+          {bool bold = false}) =>
+      Row(
+        mainAxisAlignment:
+            MainAxisAlignment.spaceBetween,
         children: [
           Text(label,
               style: TextStyle(
-                  fontWeight: bold ? FontWeight.bold : null)),
+                  fontWeight:
+                      bold ? FontWeight.bold : null)),
           Text(
             formatRupiah(harga),
             style: TextStyle(
-                fontWeight: bold ? FontWeight.bold : null),
+                fontWeight:
+                    bold ? FontWeight.bold : null),
           ),
         ],
       );

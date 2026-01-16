@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../utils/format_rupiah.dart';
 import '../models/cart_item.dart';
+import '../data/cart_notifier.dart';
+import '../data/data_produk.dart';
+import 'home_page.dart';
 
 class InvoicePage extends StatelessWidget {
   final String nama;
@@ -32,7 +35,6 @@ class InvoicePage extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          /// STATUS
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -57,7 +59,6 @@ class InvoicePage extends StatelessWidget {
 
           const SizedBox(height: 20),
 
-          /// DETAIL PENGIRIMAN
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -69,29 +70,17 @@ class InvoicePage extends StatelessWidget {
               children: [
                 const Text(
                   'Detail Pengiriman',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Text('Nama: $nama'),
-                const SizedBox(height: 6),
                 Text('Alamat: $alamat'),
-                const SizedBox(height: 6),
                 Text('Tanggal: $tanggal'),
               ],
             ),
           ),
 
           const SizedBox(height: 20),
-
-          /// PRODUK
-          const Text(
-            'Produk Dipesan',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 12),
 
           ...items.map(
             (item) => Container(
@@ -104,24 +93,8 @@ class InvoicePage extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.produk.nama,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${formatRupiah(item.produk.harga)} x ${item.qty}',
-                        style: const TextStyle(color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                  Text(
-                    formatRupiah(item.totalHarga),
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
+                  Text('${item.produk.nama} x ${item.qty}'),
+                  Text(formatRupiah(item.totalHarga)),
                 ],
               ),
             ),
@@ -129,48 +102,21 @@ class InvoicePage extends StatelessWidget {
 
           const SizedBox(height: 20),
 
-          /// TOTAL
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Total Pembayaran',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  formatRupiah(total),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          /// BUTTON
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () {
-                Navigator.pop(context, true);
-                    },
+                keranjang.clear();
+                cartCount.value = 0;
 
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const HomePage(),
+                  ),
+                  (route) => false,
+                );
+              },
               child: const Text('Kembali ke Home'),
             ),
           ),

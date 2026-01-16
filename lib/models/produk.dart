@@ -6,6 +6,9 @@ class Produk {
   final String image;
   final String kategori;
 
+  /// VARIAN UKURAN + TAMBAHAN HARGA
+  final Map<String, int> varianHarga;
+
   Produk({
     required this.nama,
     required this.deskripsi,
@@ -13,5 +16,6 @@ class Produk {
     required this.harga,
     required this.image,
     required this.kategori,
+    required this.varianHarga,
   });
 }

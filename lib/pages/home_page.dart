@@ -5,6 +5,10 @@ import '../data/cart_notifier.dart';
 import '../utils/format_rupiah.dart';
 import 'detail_produk_page.dart';
 import 'cart_page.dart';
+import 'order_history_page.dart';
+import 'profile_page.dart';
+import 'login_page.dart';
+import '../data/user_data.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -16,11 +20,33 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   String selectedKategori = 'Semua';
 
+  final TextEditingController searchController = TextEditingController();
+  String searchQuery = '';
+
   List<Produk> get filteredProduk {
-    if (selectedKategori == 'Semua') return produkList;
-    return produkList
-        .where((p) => p.kategori == selectedKategori)
-        .toList();
+    return produkList.where((produk) {
+      final cocokKategori =
+          selectedKategori == 'Semua' ||
+              produk.kategori == selectedKategori;
+
+      final cocokSearch = produk.nama
+          .toLowerCase()
+          .contains(searchQuery.toLowerCase());
+
+      return cocokKategori && cocokSearch;
+    }).toList();
+  }
+
+  /// ✅ LOGOUT (FIX FINAL)
+  void logout(BuildContext context) {
+    UserData.email = null;
+    UserData.password = null;
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginPage()),
+      (route) => false,
+    );
   }
 
   @override
@@ -28,6 +54,59 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
 
+      /// ===============================
+      /// DRAWER
+      /// ===============================
+      drawer: Drawer(
+        child: Column(
+          children: [
+            UserAccountsDrawerHeader(
+              decoration: const BoxDecoration(
+                color: Colors.deepPurple,
+              ),
+              accountName: const Text('User'),
+              accountEmail: Text(UserData.email ?? '-'),
+              currentAccountPicture: const CircleAvatar(
+                backgroundColor: Colors.white,
+                child: Icon(
+                  Icons.person,
+                  color: Colors.deepPurple,
+                  size: 36,
+                ),
+              ),
+            ),
+
+            ListTile(
+              leading: const Icon(Icons.person),
+              title: const Text('Profile'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ProfilePage(),
+                  ),
+                );
+              },
+            ),
+
+            const Divider(),
+
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.red),
+              title: const Text(
+                'Logout',
+                style: TextStyle(color: Colors.red),
+              ),
+              onTap: () => logout(context),
+            ),
+          ],
+        ),
+      ),
+
+      /// ===============================
+      /// APP BAR
+      /// ===============================
       appBar: AppBar(
         title: const Text(
           'Amanury Parfume',
@@ -35,6 +114,18 @@ class _HomePageState extends State<HomePage> {
         ),
         centerTitle: true,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.receipt_long),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const OrderHistoryPage(),
+                ),
+              );
+            },
+          ),
+
           ValueListenableBuilder<int>(
             valueListenable: cartCount,
             builder: (context, value, _) {
@@ -75,41 +166,81 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
 
+      /// ===============================
+      /// BODY (TIDAK DIUBAH)
+      /// ===============================
       body: Column(
         children: [
-          /// ===============================
-          /// KATEGORI
-          /// ===============================
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: ['Semua', 'Mans', 'Women', 'Unisex'].map((kategori) {
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+            child: TextField(
+              controller: searchController,
+              onChanged: (value) {
+                setState(() {
+                  searchQuery = value;
+                });
+              },
+              decoration: InputDecoration(
+                hintText: 'Cari parfum...',
+                prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+
+          SizedBox(
+            height: 48,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              children: ['Semua', 'Mans', 'Women', 'Unisex']
+                  .map((kategori) {
                 final aktif = selectedKategori == kategori;
+
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: ChoiceChip(
-                    label: Text(kategori),
-                    selected: aktif,
-                    selectedColor: Colors.deepPurple,
-                    labelStyle: TextStyle(
-                      color: aktif ? Colors.white : Colors.black,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    onSelected: (_) {
+                  padding: const EdgeInsets.only(right: 10),
+                  child: GestureDetector(
+                    onTap: () {
                       setState(() {
                         selectedKategori = kategori;
                       });
                     },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 22,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color:
+                            aktif ? Colors.deepPurple : Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: aktif
+                              ? Colors.deepPurple
+                              : Colors.grey.shade300,
+                        ),
+                      ),
+                      child: Text(
+                        kategori,
+                        style: TextStyle(
+                          color:
+                              aktif ? Colors.white : Colors.black87,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                   ),
                 );
               }).toList(),
             ),
           ),
 
-          /// ===============================
-          /// GRID PRODUK
-          /// ===============================
           Expanded(
             child: GridView.builder(
               padding: const EdgeInsets.all(16),
@@ -119,8 +250,6 @@ class _HomePageState extends State<HomePage> {
                 crossAxisCount: 2,
                 mainAxisSpacing: 16,
                 crossAxisSpacing: 16,
-
-                ///  CARD LEBIH PENDEK & SEIMBANG
                 childAspectRatio: 0.85,
               ),
               itemBuilder: (context, index) {
@@ -150,9 +279,6 @@ class _HomePageState extends State<HomePage> {
                     ),
                     child: Column(
                       children: [
-                        /// ===============================
-                        /// GAMBAR (BESAR & SEIMBANG)
-                        /// ===============================
                         Expanded(
                           flex: 6,
                           child: Padding(
@@ -163,10 +289,6 @@ class _HomePageState extends State<HomePage> {
                             ),
                           ),
                         ),
-
-                        /// ===============================
-                        /// INFO
-                        /// ===============================
                         Expanded(
                           flex: 4,
                           child: Padding(
