@@ -2,23 +2,20 @@ import 'package:flutter/material.dart';
 import '../models/cart_item.dart';
 import '../utils/format_rupiah.dart';
 import 'invoice_page.dart';
-import '../models/order.dart';
-import '../data/order_data.dart';
 import '../data/cart_notifier.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CheckoutPage extends StatefulWidget {
   final List<CartItem> items;
 
-  const CheckoutPage({
-    super.key,
-    required this.items,
-  });
+  const CheckoutPage({super.key, required this.items});
 
   @override
   State<CheckoutPage> createState() => _CheckoutPageState();
 }
 
 class _CheckoutPageState extends State<CheckoutPage> {
+  final supabase = Supabase.instance.client;
   final namaC = TextEditingController();
   final alamatC = TextEditingController();
 
@@ -30,202 +27,163 @@ class _CheckoutPageState extends State<CheckoutPage> {
     return '${now.day}/${now.month}/${now.year}';
   }
 
-  /// ===============================
-  ///  PERBAIKAN UTAMA ADA DI SINI
-  /// ===============================
   Future<void> lanjutBayar() async {
     if (namaC.text.isEmpty || alamatC.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nama & alamat wajib diisi')),
+        const SnackBar(
+          content: Text('Nama & alamat wajib diisi'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
 
-    ///  SIMPAN KE RIWAYAT PESANAN
-    orderHistory.add(
-      Order(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        tanggal: DateTime.now(),
-        items: List.from(widget.items),
-        totalHarga: totalHarga,
-        nama: namaC.text,
-        alamat: alamatC.text,
-      ),
-    );
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
 
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => InvoicePage(
-          nama: namaC.text,
-          alamat: alamatC.text,
-          tanggal: tanggalHariIni(),
-          items: widget.items,
-          total: totalHarga,
-        ),
-      ),
-    );
+    try {
+      final orderResponse = await supabase
+          .from('orders')
+          .insert({
+            'user_id': user.id,
+            'total_price': totalHarga,
+            'customer_name': namaC.text,
+            'address': alamatC.text,
+            'status': 'pending',
+          })
+          .select()
+          .single();
 
-    ///  JIKA INVOICE SELESAI
-    if (result == true) {
-      widget.items.clear();
+      final String orderId = orderResponse['id'];
+
+      final List<Map<String, dynamic>> orderItems = widget.items.map((item) {
+        return {
+          'order_id': orderId,
+          'product_id': item.produk.id,
+          'quantity': item.qty,
+          'price_at_purchase': item.itemPrice,
+          'variant_name': item.variantName,
+        };
+      }).toList();
+
+      await supabase.from('order_items').insert(orderItems);
+
+      for (var item in widget.items) {
+        if (item.id != null) {
+          await supabase.from('cart').delete().eq('id', item.id!);
+        }
+      }
+
       cartCount.value = 0;
 
-      Navigator.pop(context, true);
+      if (!mounted) return;
+
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => InvoicePage(
+            nama: namaC.text,
+            alamat: alamatC.text,
+            tanggal: tanggalHariIni(),
+            items: widget.items,
+            total: totalHarga,
+          ),
+        ),
+      );
+
+      if (result == true) {
+        if (!mounted) return;
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      debugPrint("Error checkout: $e");
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gagal: $e')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      appBar: AppBar(
-        title: const Text('Checkout'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 1,
-      ),
-
+      backgroundColor: Colors.white,
+      appBar: AppBar(title: const Text('Checkout'), centerTitle: true),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(24),
         children: [
-          /// ALAMAT
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: box(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                rowTitle(Icons.location_on, 'Alamat Pengiriman'),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: namaC,
-                  decoration: input('Nama Penerima'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: alamatC,
-                  maxLines: 3,
-                  decoration: input('Alamat Lengkap'),
-                ),
-              ],
+          _buildSectionTitle('Detail Pengiriman'),
+          const SizedBox(height: 16),
+          TextField(
+            controller: namaC,
+            decoration: const InputDecoration(
+              hintText: 'Nama Lengkap Penerima',
+              prefixIcon: Icon(Icons.person_outline),
             ),
           ),
-
           const SizedBox(height: 16),
-
-          /// PRODUK
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: box(),
-            child: Column(
+          TextField(
+            controller: alamatC,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              hintText: 'Alamat Lengkap Pengiriman',
+              prefixIcon: Icon(Icons.location_on_outlined),
+            ),
+          ),
+          const SizedBox(height: 32),
+          _buildSectionTitle('Ringkasan Pesanan'),
+          const SizedBox(height: 16),
+          ...widget.items.map((item) => _buildItemRow(item)),
+          const Divider(height: 32),
+          _buildPriceRow('Subtotal', totalHarga),
+          _buildPriceRow('Biaya Pengiriman', 0),
+          const SizedBox(height: 12),
+          _buildPriceRow('Total Pembayaran', totalHarga, isTotal: true),
+          const SizedBox(height: 100),
+        ],
+      ),
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 20,
+              offset: const Offset(0, -5),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                rowTitle(Icons.shopping_bag, 'Produk Dipesan'),
-                const SizedBox(height: 12),
-                ...widget.items.map(
-                  (item) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
-                            children: [
-                              Text(item.produk.nama,
-                                  style: const TextStyle(
-                                      fontWeight:
-                                          FontWeight.bold)),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${item.qty} x ${formatRupiah(item.produk.harga)}',
-                                style: const TextStyle(
-                                    color: Colors.grey),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Text(
-                          formatRupiah(item.totalHarga),
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
+                const Text(
+                  'Total Pembayaran',
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+                Text(
+                  formatRupiah(totalHarga),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF6ADAFF),
                   ),
                 ),
               ],
             ),
-          ),
-
-          const SizedBox(height: 16),
-
-          /// RINGKASAN
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: box(),
-            child: Column(
-              children: [
-                rowHarga('Subtotal', totalHarga),
-                const SizedBox(height: 8),
-                rowHarga('Ongkir', 0),
-                const Divider(height: 24),
-                rowHarga('Total Pembayaran', totalHarga,
-                    bold: true),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 100),
-        ],
-      ),
-
-      /// BOTTOM BAR
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(color: Colors.black12, blurRadius: 10),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment:
-              MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
-              children: [
-                const Text('Total Pembayaran',
-                    style: TextStyle(color: Colors.grey)),
-                Text(
-                  formatRupiah(totalHarga),
-                  style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue),
+            const SizedBox(width: 24),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: lanjutBayar,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFFE500),
+                  foregroundColor: Colors.black,
                 ),
-              ],
-            ),
-            ElevatedButton(
-              onPressed: lanjutBayar,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
-                padding:
-                    const EdgeInsets.symmetric(
-                        horizontal: 32,
-                        vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.circular(12),
-                ),
+                child: const Text('Buat Pesanan'),
               ),
-              child: const Text('Buat Pesanan'),
             ),
           ],
         ),
@@ -233,48 +191,66 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
-  /// ===============================
-  /// HELPER
-  /// ===============================
-  BoxDecoration box() => BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      );
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+    );
+  }
 
-  Widget rowTitle(IconData icon, String title) => Row(
+  Widget _buildItemRow(CartItem item) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
         children: [
-          Icon(icon, color: Colors.orange),
-          const SizedBox(width: 8),
-          Text(title,
-              style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold)),
-        ],
-      );
-
-  InputDecoration input(String label) => InputDecoration(
-        labelText: label,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-      );
-
-  Widget rowHarga(String label, int harga,
-          {bool bold = false}) =>
-      Row(
-        mainAxisAlignment:
-            MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label,
-              style: TextStyle(
-                  fontWeight:
-                      bold ? FontWeight.bold : null)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.produk.nama,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  '${item.qty}x ${item.variantName}',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                ),
+              ],
+            ),
+          ),
           Text(
-            formatRupiah(harga),
-            style: TextStyle(
-                fontWeight:
-                    bold ? FontWeight.bold : null),
+            formatRupiah(item.totalHarga),
+            style: const TextStyle(fontWeight: FontWeight.bold),
           ),
         ],
-      );
+      ),
+    );
+  }
+
+  Widget _buildPriceRow(String label, int price, {bool isTotal = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+              fontSize: isTotal ? 16 : 14,
+              color: isTotal ? Colors.black : Colors.grey[600],
+            ),
+          ),
+          Text(
+            formatRupiah(price),
+            style: TextStyle(
+              fontWeight: isTotal ? FontWeight.w900 : FontWeight.bold,
+              fontSize: isTotal ? 20 : 14,
+              color: isTotal ? const Color(0xFF6ADAFF) : Colors.black,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

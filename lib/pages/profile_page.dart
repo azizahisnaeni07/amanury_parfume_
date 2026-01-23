@@ -1,7 +1,7 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import '../data/user_data.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -11,282 +11,247 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  late TextEditingController namaC;
-  late TextEditingController emailC;
-  late TextEditingController alamatC;
-  late TextEditingController passwordC;
-  late TextEditingController phoneC;
-
-  bool showPassword = false;
-  File? profileImage;
+  final supabase = Supabase.instance.client;
+  final namaC = TextEditingController();
+  final alamatC = TextEditingController();
+  final phoneC = TextEditingController();
+  bool _isLoading = false;
+  String? avatarUrl;
+  Uint8List? profileImageBytes;
 
   @override
   void initState() {
     super.initState();
+    _getInitialProfile();
+  }
 
-    namaC = TextEditingController(text: UserData.nama ?? '');
-    emailC = TextEditingController(text: UserData.email ?? '');
-    alamatC = TextEditingController(text: UserData.alamat ?? '');
-    passwordC = TextEditingController(text: UserData.password ?? '');
-    phoneC = TextEditingController(text: UserData.phone ?? '');
-
-    /// LOAD FOTO JIKA ADA
-    if (UserData.profileImagePath != null &&
-        UserData.profileImagePath!.isNotEmpty) {
-      profileImage = File(UserData.profileImagePath!);
+  Future<void> _getInitialProfile() async {
+    setState(() => _isLoading = true);
+    try {
+      final userId = supabase.auth.currentUser!.id;
+      final data = await supabase
+          .from('profiles')
+          .select()
+          .eq('id', userId)
+          .maybeSingle();
+      if (data != null) {
+        setState(() {
+          namaC.text = data['full_name'] ?? '';
+          alamatC.text = data['address'] ?? '';
+          phoneC.text = data['phone_number'] ?? '';
+          avatarUrl = data['avatar_url'];
+        });
+      }
+    } catch (e) {
+      debugPrint("Error: $e");
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
-  /// ===============================
-  /// PILIH FOTO
-  /// ===============================
   Future<void> pilihFoto(ImageSource source) async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(
-      source: source,
-      imageQuality: 70,
-    );
-
+    final picked = await picker.pickImage(source: source, imageQuality: 50);
     if (picked != null) {
-      setState(() {
-        profileImage = File(picked.path);
-        UserData.profileImagePath = picked.path;
-      });
+      final bytes = await picked.readAsBytes();
+      setState(() => _isLoading = true);
+      try {
+        final userId = supabase.auth.currentUser!.id;
+        final fileName = '$userId-avatar.${picked.name.split('.').last}';
+        await supabase.storage
+            .from('avatars')
+            .uploadBinary(
+              fileName,
+              bytes,
+              fileOptions: const FileOptions(upsert: true),
+            );
+        final publicUrl = supabase.storage
+            .from('avatars')
+            .getPublicUrl(fileName);
+
+        // Tambahkan timestamp agar browser/flutter mengabaikan cache jika nama file sama
+        final newAvatarUrl =
+            "$publicUrl?t=${DateTime.now().millisecondsSinceEpoch}";
+
+        // AUTO-SAVE ke tabel profiles
+        await supabase.from('profiles').upsert({
+          'id': userId,
+          'avatar_url': newAvatarUrl,
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+
+        setState(() {
+          profileImageBytes = bytes;
+          avatarUrl = newAvatarUrl;
+        });
+      } catch (e) {
+        debugPrint("Error: $e");
+      } finally {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
-  /// ===============================
-  /// SIMPAN PROFILE
-  /// ===============================
-  void simpanProfile() {
-    if (namaC.text.isEmpty ||
-        emailC.text.isEmpty ||
-        alamatC.text.isEmpty ||
-        passwordC.text.isEmpty ||
-        phoneC.text.isEmpty) {
+  Future<void> simpanProfile() async {
+    if (namaC.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Semua field wajib diisi')),
+        const SnackBar(
+          content: Text('Nama wajib diisi'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
-
-    UserData.nama = namaC.text;
-    UserData.email = emailC.text;
-    UserData.alamat = alamatC.text;
-    UserData.password = passwordC.text;
-    UserData.phone = phoneC.text;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Profile berhasil disimpan'),
-        backgroundColor: Colors.green,
-      ),
-    );
-  }
-
-  /// ===============================
-  /// LUPA PASSWORD
-  /// ===============================
-  void lupaPassword() {
-    final newPassC = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Ganti Password'),
-        content: TextField(
-          controller: newPassC,
-          obscureText: true,
-          decoration: const InputDecoration(labelText: 'Password Baru'),
+    setState(() => _isLoading = true);
+    try {
+      final userId = supabase.auth.currentUser!.id;
+      await supabase.from('profiles').upsert({
+        'id': userId,
+        'full_name': namaC.text,
+        'address': alamatC.text,
+        'phone_number': phoneC.text,
+        'avatar_url': avatarUrl,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Profil diperbarui'),
+          backgroundColor: Color(0xFF6ADAFF),
+          behavior: SnackBarBehavior.floating,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (newPassC.text.isEmpty) return;
-
-              setState(() {
-                UserData.password = newPassC.text;
-                passwordC.text = newPassC.text;
-              });
-
-              Navigator.pop(context);
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Password berhasil diganti'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            },
-            child: const Text('Simpan'),
-          ),
-        ],
-      ),
-    );
+      );
+    } catch (e) {
+      debugPrint("Error: $e");
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profile User'),
-        backgroundColor: Colors.deepPurple,
+      backgroundColor: Colors.white,
+      appBar: AppBar(title: const Text('Profil Saya'), centerTitle: true),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
+              child: Column(
+                children: [
+                  Stack(
+                    alignment: Alignment.bottomRight,
+                    children: [
+                      CircleAvatar(
+                        radius: 60,
+                        backgroundColor: Colors.grey[50],
+                        backgroundImage: profileImageBytes != null
+                            ? MemoryImage(profileImageBytes!)
+                            : (avatarUrl != null
+                                      ? NetworkImage(avatarUrl!)
+                                      : null)
+                                  as ImageProvider?,
+                        child: (profileImageBytes == null && avatarUrl == null)
+                            ? const Icon(
+                                Icons.person_outline,
+                                size: 60,
+                                color: Color(0xFF6ADAFF),
+                              )
+                            : null,
+                      ),
+                      GestureDetector(
+                        onTap: () => _showPickerOptions(),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF6ADAFF),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.camera_alt_outlined,
+                            size: 20,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 48),
+                  TextField(
+                    controller: namaC,
+                    decoration: const InputDecoration(
+                      hintText: 'Nama Lengkap',
+                      prefixIcon: Icon(Icons.person_outline),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    enabled: false,
+                    decoration: InputDecoration(
+                      hintText: supabase.auth.currentUser?.email,
+                      prefixIcon: const Icon(Icons.email_outlined),
+                      fillColor: Colors.grey[100],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: phoneC,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      hintText: 'Nomor Telepon',
+                      prefixIcon: Icon(Icons.phone_outlined),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: alamatC,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      hintText: 'Alamat Lengkap',
+                      prefixIcon: Icon(Icons.location_on_outlined),
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : simpanProfile,
+                      child: const Text('Simpan Perubahan'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+
+  void _showPickerOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      body: SingleChildScrollView(
+      builder: (_) => Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            /// FOTO PROFILE
-            Stack(
-              alignment: Alignment.bottomRight,
-              children: [
-                CircleAvatar(
-                  radius: 50,
-                  backgroundColor: Colors.deepPurple.shade100,
-                  backgroundImage:
-                      profileImage != null ? FileImage(profileImage!) : null,
-                  child: profileImage == null
-                      ? const Icon(Icons.person,
-                          size: 55, color: Colors.white)
-                      : null,
-                ),
-                InkWell(
-                  onTap: () {
-                    showModalBottomSheet(
-                      context: context,
-                      shape: const RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.vertical(top: Radius.circular(20)),
-                      ),
-                      builder: (_) => Wrap(
-                        children: [
-                          ListTile(
-                            leading: const Icon(Icons.camera_alt),
-                            title: const Text('Kamera'),
-                            onTap: () {
-                              Navigator.pop(context);
-                              pilihFoto(ImageSource.camera);
-                            },
-                          ),
-                          ListTile(
-                            leading: const Icon(Icons.photo),
-                            title: const Text('Galeri'),
-                            onTap: () {
-                              Navigator.pop(context);
-                              pilihFoto(ImageSource.gallery);
-                            },
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: const BoxDecoration(
-                      color: Colors.deepPurple,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.edit,
-                        size: 18, color: Colors.white),
-                  ),
-                ),
-              ],
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Ambil Foto'),
+              onTap: () {
+                Navigator.pop(context);
+                pilihFoto(ImageSource.camera);
+              },
             ),
-
-            const SizedBox(height: 24),
-
-            TextField(
-              controller: namaC,
-              decoration: const InputDecoration(
-                labelText: 'Nama',
-                prefixIcon: Icon(Icons.person),
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            TextField(
-              controller: emailC,
-              decoration: const InputDecoration(
-                labelText: 'Email',
-                prefixIcon: Icon(Icons.email),
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            TextField(
-              controller: phoneC,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'No. Handphone',
-                prefixIcon: Icon(Icons.phone),
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            TextField(
-              controller: alamatC,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Alamat',
-                prefixIcon: Icon(Icons.location_on),
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            TextField(
-              controller: passwordC,
-              obscureText: !showPassword,
-              decoration: InputDecoration(
-                labelText: 'Password',
-                prefixIcon: const Icon(Icons.lock),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    showPassword
-                        ? Icons.visibility
-                        : Icons.visibility_off,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      showPassword = !showPassword;
-                    });
-                  },
-                ),
-                border: const OutlineInputBorder(),
-              ),
-            ),
-
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: lupaPassword,
-                child: const Text('Lupa / Ganti Password?'),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: simpanProfile,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepPurple,
-                ),
-                child: const Text(
-                  'Simpan Profile',
-                  style:
-                      TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
+            ListTile(
+              leading: const Icon(Icons.photo_outlined),
+              title: const Text('Pilih dari Galeri'),
+              onTap: () {
+                Navigator.pop(context);
+                pilihFoto(ImageSource.gallery);
+              },
             ),
           ],
         ),

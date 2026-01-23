@@ -41,23 +41,16 @@ class InvoicePage extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.12),
+              color: Colors.green.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Column(
               children: const [
-                Icon(
-                  Icons.check_circle,
-                  size: 48,
-                  color: Colors.green,
-                ),
+                Icon(Icons.check_circle, size: 48, color: Colors.green),
                 SizedBox(height: 8),
                 Text(
                   'Pesanan Berhasil',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 SizedBox(height: 4),
                 Text(
@@ -114,9 +107,7 @@ class InvoicePage extends StatelessWidget {
                         Expanded(
                           child: Text(
                             item.produk.nama,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w500,
-                            ),
+                            style: const TextStyle(fontWeight: FontWeight.w500),
                           ),
                         ),
                         Text(
@@ -168,9 +159,7 @@ class InvoicePage extends StatelessWidget {
 
                 Navigator.pushAndRemoveUntil(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => const HomePage(),
-                  ),
+                  MaterialPageRoute(builder: (_) => const HomePage()),
                   (route) => false,
                 );
               },
@@ -196,80 +185,64 @@ class InvoicePage extends StatelessWidget {
   /// HELPER UI
   /// ===============================
   Widget _card({required Widget child}) => Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: const [
-            BoxShadow(
-              color: Colors.black12,
-              blurRadius: 12,
-              offset: Offset(0, 6),
-            ),
-          ],
-        ),
-        child: child,
-      );
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      boxShadow: const [
+        BoxShadow(color: Colors.black12, blurRadius: 12, offset: Offset(0, 6)),
+      ],
+    ),
+    child: child,
+  );
 
   Widget _title(IconData icon, String text) => Row(
-        children: [
-          Icon(icon, color: Colors.blue),
-          const SizedBox(width: 8),
-          Text(
-            text,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      );
+    children: [
+      Icon(icon, color: Colors.blue),
+      const SizedBox(width: 8),
+      Text(
+        text,
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+      ),
+    ],
+  );
 
   Widget _infoRow(String label, String value) => Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 80,
-              child: Text(
-                label,
-                style: const TextStyle(color: Colors.grey),
-              ),
-            ),
-            Expanded(
-              child: Text(
-                value,
-                style: const TextStyle(fontWeight: FontWeight.w500),
-              ),
-            ),
-          ],
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 80,
+          child: Text(label, style: const TextStyle(color: Colors.grey)),
         ),
-      );
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.w500),
+          ),
+        ),
+      ],
+    ),
+  );
 
   Widget _priceRow(
     String label,
     int value, {
     bool bold = false,
     Color? color,
-  }) =>
-      Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontWeight: bold ? FontWeight.bold : null,
-            ),
-          ),
-          Text(
-            formatRupiah(value),
-            style: TextStyle(
-              fontWeight: bold ? FontWeight.bold : null,
-              color: color,
-              fontSize: bold ? 18 : 14,
-            ),
-          ),
-        ],
-      );
+  }) => Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Text(label, style: TextStyle(fontWeight: bold ? FontWeight.bold : null)),
+      Text(
+        formatRupiah(value),
+        style: TextStyle(
+          fontWeight: bold ? FontWeight.bold : null,
+          color: color,
+          fontSize: bold ? 18 : 14,
+        ),
+      ),
+    ],
+  );
 }

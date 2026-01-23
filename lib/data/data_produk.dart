@@ -5,6 +5,7 @@ final List<CartItem> keranjang = [];
 
 final List<Produk> produkList = [
   Produk(
+    id: '1',
     nama: 'Tavisha',
     deskripsi:
         'Aroma Tavisha aroma yang tidak terlalu kuat, tetapi tetap meninggalkan kesan.',
@@ -24,6 +25,7 @@ final List<Produk> produkList = [
 ''',
     harga: 25000,
     image: 'assets/images/tavisha.png',
+    images: ['assets/images/tavisha.png'],
     kategori: 'Women',
     varianHarga: {
       '10 ml': 10000,
@@ -34,6 +36,7 @@ final List<Produk> produkList = [
   ),
 
   Produk(
+    id: '2',
     nama: 'Lakshya',
     deskripsi:
         'Cocok untuk pria yang ingin tampil berkelas,modern,dan berkarakter,tanpa aroma yang terlalu berat atau tua',
@@ -50,6 +53,7 @@ final List<Produk> produkList = [
 ''',
     harga: 25000,
     image: 'assets/images/lakshya.png',
+    images: ['assets/images/lakshya.png'],
     kategori: 'Mans',
     varianHarga: {
       '10 ml': 10000,
@@ -60,6 +64,7 @@ final List<Produk> produkList = [
   ),
 
   Produk(
+    id: '3',
     nama: 'Annisha',
     deskripsi:
         'Parfum ini memiliki karakteristik manis, floral, dan hangat, yang memancarkan sisi feminin, romantis, dan elegan',
@@ -75,6 +80,7 @@ final List<Produk> produkList = [
 ''',
     harga: 25000,
     image: 'assets/images/annisha.png',
+    images: ['assets/images/annisha.png'],
     kategori: 'Women',
     varianHarga: {
       '10 ml': 10000,
@@ -85,6 +91,7 @@ final List<Produk> produkList = [
   ),
 
   Produk(
+    id: '4',
     nama: 'Kavisha',
     deskripsi:
         'Parfume yang cocok untuk pribadi tenang, elegan, cerdas, dan intuitif',
@@ -104,7 +111,8 @@ final List<Produk> produkList = [
 ''',
     harga: 25000,
     image: 'assets/images/kavisha.png',
-    kategori: 'Women', 
+    images: ['assets/images/kavisha.png'],
+    kategori: 'Women',
     varianHarga: {
       '10 ml': 10000,
       '30 ml': 25000,
@@ -114,6 +122,7 @@ final List<Produk> produkList = [
   ),
 
   Produk(
+    id: '5',
     nama: 'Lively Embrace',
     deskripsi: 'Unisex dengan nuansa feminin yang dewasa.',
     deskripsiLengkap: '''
@@ -133,6 +142,7 @@ final List<Produk> produkList = [
 ''',
     harga: 25000,
     image: 'assets/images/lively embrace.png',
+    images: ['assets/images/lively embrace.png'],
     kategori: 'Unisex',
     varianHarga: {
       '10 ml': 10000,

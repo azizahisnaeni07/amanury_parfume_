@@ -1,41 +1,69 @@
 import 'package:flutter/material.dart';
 import '../models/produk.dart';
-import '../models/cart_item.dart';
-import '../data/data_produk.dart';
 import '../utils/format_rupiah.dart';
 import '../data/cart_notifier.dart';
 import 'cart_page.dart';
+import '../utils/supabase_helper.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-class DetailProdukPage extends StatelessWidget {
+class DetailProdukPage extends StatefulWidget {
   final Produk produk;
 
-  const DetailProdukPage({
-    super.key,
-    required this.produk,
-  });
+  const DetailProdukPage({super.key, required this.produk});
 
-  /// ===============================
-  /// BOTTOM SHEET PILIH UKURAN
-  /// ===============================
-  void showPilihUkuran(
-    BuildContext context, {
-    required bool beliLangsung,
-  }) {
-    String selectedUkuran = produk.varianHarga.keys.first;
+  @override
+  State<DetailProdukPage> createState() => _DetailProdukPageState();
+}
+
+class _DetailProdukPageState extends State<DetailProdukPage> {
+  final PageController _pageController = PageController();
+  int _currentPage = 0;
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  Future<void> updateCartBadge() async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final response = await supabase
+          .from('cart')
+          .select('quantity')
+          .eq('user_id', user.id);
+
+      final List data = response as List;
+      int total = 0;
+      for (var item in data) {
+        total += (item['quantity'] as int);
+      }
+      cartCount.value = total;
+    } catch (e) {
+      debugPrint("Error update badge: $e");
+    }
+  }
+
+  void showPilihUkuran(BuildContext context, {required bool beliLangsung}) {
+    String selectedUkuran = widget.produk.varianHarga.keys.first;
+    final supabase = Supabase.instance.client;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(24),
-        ),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (_) {
         return StatefulBuilder(
-          builder: (context, setState) {
+          builder: (context, setModalState) {
             int hargaFinal =
-                produk.harga + produk.varianHarga[selectedUkuran]!;
+                widget.produk.varianHarga[selectedUkuran] ??
+                widget.produk.harga;
 
             return Padding(
               padding: EdgeInsets.fromLTRB(
@@ -48,139 +76,103 @@ class DetailProdukPage extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  /// NAMA PRODUK
                   Text(
-                    produk.nama,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  /// HARGA
-                  Text(
-                    formatRupiah(hargaFinal),
+                    widget.produk.nama,
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF2563EB),
                     ),
                   ),
-
+                  const SizedBox(height: 8),
+                  Text(
+                    formatRupiah(hargaFinal),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF6ADAFF),
+                    ),
+                  ),
                   const SizedBox(height: 24),
-
-                  /// PILIH UKURAN
                   const Text(
                     'Pilih Ukuran',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
-
                   const SizedBox(height: 12),
-
                   Wrap(
-                    spacing: 10,
-                    children:
-                        produk.varianHarga.keys.map((ukuran) {
+                    spacing: 12,
+                    children: widget.produk.varianHarga.keys.map((ukuran) {
                       final aktif = selectedUkuran == ukuran;
                       return ChoiceChip(
                         label: Text(ukuran),
                         selected: aktif,
-                        selectedColor:
-                            const Color(0xFF2563EB),
+                        showCheckmark: false,
+                        selectedColor: const Color(0xFF6ADAFF),
+                        onSelected: (_) =>
+                            setModalState(() => selectedUkuran = ukuran),
                         labelStyle: TextStyle(
-                          color:
-                              aktif ? Colors.white : Colors.black,
-                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                          fontWeight: aktif
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                         ),
-                        onSelected: (_) {
-                          setState(() {
-                            selectedUkuran = ukuran;
-                          });
-                        },
                       );
                     }).toList(),
                   ),
-
                   const SizedBox(height: 32),
-
-                  /// BUTTON KONFIRMASI
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () {
-                        final produkFix = Produk(
-                          nama:
-                              '${produk.nama} ($selectedUkuran)',
-                          deskripsi: produk.deskripsi,
-                          deskripsiLengkap:
-                              produk.deskripsiLengkap,
-                          harga: hargaFinal,
-                          image: produk.image,
-                          kategori: produk.kategori,
-                          varianHarga: produk.varianHarga,
-                        );
+                      onPressed: () async {
+                        final user = supabase.auth.currentUser;
+                        if (user == null) return;
+                        try {
+                          final existing = await supabase
+                              .from('cart')
+                              .select()
+                              .eq('user_id', user.id)
+                              .eq('product_id', widget.produk.id)
+                              .eq('variant_name', selectedUkuran)
+                              .maybeSingle();
 
-                        final index = keranjang.indexWhere(
-                          (item) =>
-                              item.produk.nama ==
-                              produkFix.nama,
-                        );
+                          if (existing != null) {
+                            await supabase
+                                .from('cart')
+                                .update({'quantity': existing['quantity'] + 1})
+                                .eq('id', existing['id']);
+                          } else {
+                            await supabase.from('cart').insert({
+                              'user_id': user.id,
+                              'product_id': widget.produk.id,
+                              'quantity': 1,
+                              'variant_name': selectedUkuran,
+                            });
+                          }
 
-                        if (index >= 0) {
-                          keranjang[index].qty++;
-                        } else {
-                          keranjang
-                              .add(CartItem(produk: produkFix));
-                        }
+                          await updateCartBadge();
+                          if (!context.mounted) return;
+                          Navigator.pop(context);
 
-                        cartCount.value = keranjang.fold(
-                          0,
-                          (sum, item) => sum + item.qty,
-                        );
-
-                        Navigator.pop(context);
-
-                        if (beliLangsung) {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const CartPage(),
-                            ),
-                          );
-                        } else {
-                          ScaffoldMessenger.of(context)
-                              .showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Ditambahkan ($selectedUkuran)',
+                          if (beliLangsung) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const CartPage(),
                               ),
-                            ),
-                          );
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Ditambahkan ke keranjang'),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          debugPrint("Error: $e");
                         }
                       },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            const Color(0xFF2563EB),
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(14),
-                        ),
-                      ),
                       child: Text(
-                        beliLangsung
-                            ? 'Beli Sekarang'
-                            : 'Masukkan Keranjang',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                        ),
+                        beliLangsung ? 'Beli Sekarang' : 'Masukkan Keranjang',
                       ),
                     ),
                   ),
@@ -195,84 +187,217 @@ class DetailProdukPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final displayImages = widget.produk.images.isEmpty
+        ? [widget.produk.image]
+        : widget.produk.images;
+
     return Scaffold(
       backgroundColor: Colors.white,
-
       appBar: AppBar(
-        title: Text(produk.nama),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
+        title: Text(widget.produk.nama, style: const TextStyle(fontSize: 16)),
+        actions: [
+          IconButton(icon: const Icon(Icons.share_outlined), onPressed: () {}),
+        ],
       ),
-
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: double.infinity,
-              height: 340,
-              color: const Color(0xFFF3F4F6),
-              child: Center(
-                child: Image.asset(
-                  produk.image,
-                  fit: BoxFit.contain,
-                  height: 280,
+            Stack(
+              alignment: Alignment.bottomCenter,
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  height: 400,
+                  child: PageView.builder(
+                    controller: _pageController,
+                    onPageChanged: (index) {
+                      setState(() {
+                        _currentPage = index;
+                      });
+                    },
+                    itemCount: displayImages.length,
+                    itemBuilder: (context, index) {
+                      final imgPath = displayImages[index];
+                      return Container(
+                        color: Colors.grey[50],
+                        padding: const EdgeInsets.symmetric(vertical: 20),
+                        child: Center(
+                          child: imgPath.startsWith('assets/')
+                              ? Image.asset(
+                                  imgPath,
+                                  fit: BoxFit.contain,
+                                  height: 320,
+                                )
+                              : (SupabaseHelper.getImageUrl(imgPath).isEmpty
+                                    ? const Icon(
+                                        Icons.image,
+                                        size: 80,
+                                        color: Colors.grey,
+                                      )
+                                    : Image.network(
+                                        SupabaseHelper.getImageUrl(imgPath),
+                                        fit: BoxFit.contain,
+                                        height: 320,
+                                        errorBuilder: (_, __, ___) =>
+                                            const Icon(
+                                              Icons.broken_image,
+                                              size: 80,
+                                              color: Colors.grey,
+                                            ),
+                                      )),
+                        ),
+                      );
+                    },
+                  ),
                 ),
-              ),
+                if (displayImages.length > 1)
+                  Positioned(
+                    bottom: 20,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(
+                        displayImages.length,
+                        (index) => AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          width: _currentPage == index ? 24 : 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(4),
+                            color: _currentPage == index
+                                ? const Color(0xFF6ADAFF)
+                                : Colors.grey[300],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
-
             Padding(
               padding: const EdgeInsets.all(24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    produk.nama,
-                    style: const TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  Text(
-                    produk.deskripsiLengkap,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      height: 1.8,
-                      color: Colors.black54,
-                    ),
-                  ),
-
-                  const SizedBox(height: 32),
-
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => showPilihUkuran(
-                            context,
-                            beliLangsung: false,
+                        child: Text(
+                          widget.produk.nama,
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
                           ),
-                          child:
-                              const Text('Tambah ke Keranjang'),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () => showPilihUkuran(
-                            context,
-                            beliLangsung: true,
-                          ),
-                          child: const Text('Beli Sekarang'),
+                      Text(
+                        formatRupiah(widget.produk.harga),
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF6ADAFF),
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF6ADAFF).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      widget.produk.kategori,
+                      style: const TextStyle(
+                        color: Color(0xFF6ADAFF),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Tentang Aroma Ini',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    widget.produk.deskripsiLengkap,
+                    style: TextStyle(
+                      fontSize: 15,
+                      height: 1.6,
+                      color: Colors.grey[800],
+                    ),
+                  ),
+                  const SizedBox(
+                    height: 100,
+                  ), // Beri padding bawah lebih banyak agar tidak tertutup bottom bar
                 ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: Container(
+        height: 100, // Beri tinggi eksplisit
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 20,
+              offset: const Offset(0, -5),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => showPilihUkuran(context, beliLangsung: false),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  side: const BorderSide(color: Color(0xFF6ADAFF), width: 2),
+                  backgroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'Keranjang',
+                  style: TextStyle(
+                    color: Color(0xFF6ADAFF),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              flex: 2,
+              child: ElevatedButton(
+                onPressed: () => showPilihUkuran(context, beliLangsung: true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6ADAFF),
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'Beli Sekarang',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
               ),
             ),
           ],
